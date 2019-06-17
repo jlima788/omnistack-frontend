@@ -1,5 +1,6 @@
 import React, { Component } from "react";
 import api from "../services/api";
+import io from "socket.io-client";
 
 import "./Feed.css";
 
@@ -12,40 +13,69 @@ export default class Feed extends Component {
   state = {
     feed: []
   };
-  async compoenetDidMount() {
+  async componentDidMount() {
+    this.registerToSocket();
     const response = await api.get("posts");
     this.setState({ feed: response.data });
   }
+
+  registerToSocket = () => {
+    const socket = io("http://localhost:3333");
+
+    socket.on("post", newPost => {
+      this.setState({ feed: [newPost, ...this.state.feed] });
+    });
+
+    socket.on("like", likedPost => {
+      this.setState({
+        feed: this.state.feed.map(post =>
+          post.id === likedPost.id ? likedPost : post
+        )
+      });
+    });
+  };
+
+  handleLike = id => {
+    api.post(`/posts/${id}/like`);
+  };
+
   render() {
     return (
       <section id="post-list">
-        <article>
-          <header>
-            <div className="user-info">
-              <span>Diego Fernandes</span>
-              <span className="place">Rio do Sul</span>
-            </div>
+        {this.state.feed.map(post => (
+          <article key={post.id}>
+            <header>
+              <div className="user-info">
+                <span>{post.author}</span>
+                <span className="place">{post.place}</span>
+              </div>
 
-            <img src={more} alt="Mais" />
-          </header>
+              <img src={more} alt="Mais" />
+            </header>
 
-          <img src="http://localhost:3333/files/IMG_0001.jpg" alt="Bonitão" />
+            <img
+              src={`http://localhost:3333/files/${post.image}`}
+              alt="Bonitão"
+            />
 
-          <footer>
-            <div className="actions">
-              <img src={like} alt="" />
-              <img src={comment} alt="" />
-              <img src={send} alt="" />
-            </div>
+            <footer>
+              <div className="actions">
+                <button type="button" onClick={() => this.handleLike(post.id)}>
+                  <img src={like} alt="" />
+                </button>
+                <img src={comment} alt="" />
+                <img src={send} alt="" />
+              </div>
 
-            <strong>900 curtidas</strong>
+              <strong>{post.likes} curtidas</strong>
 
-            <p>
-              Um post muito bacana
-              <span>#react #omnistack #top</span>
-            </p>
-          </footer>
-        </article>
+              <p>
+                {post.description}
+                <span>{post.hashtags}</span>
+              </p>
+            </footer>
+          </article>
+        ))}
       </section>
     );
   }
